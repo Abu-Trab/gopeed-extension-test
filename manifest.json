@@ -1,0 +1,6 @@
+{
+  "name": "gop-file-extractor",
+  "version": "1.0.0",
+  "main": "index.js",
+  "description": "إضافة لاستخراج الملفات من صفحات الويب"
+}
