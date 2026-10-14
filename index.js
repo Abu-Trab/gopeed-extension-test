@@ -1,46 +1,63 @@
 gopeed.events.on('load', () => {
-    console.log("Extension loaded: Direct Extractor");
+    console.log("Extension loaded: Advanced File Extractor");
 });
 
-// اعتراض الروابط الحقيقية مباشرة عند لصقها في التطبيق
 gopeed.net.intercept('access', async (ctx) => {
     const targetUrl = ctx.req.url;
     
-    // يمكنك هنا تحديد المواقع التي تريد تفعيل الاستخراج فيها (أو إزالة الشرط لتشغيله على أي رابط)
-    if (targetUrl.includes('instagram.com') || targetUrl.includes('quran.ksu.edu.sa')) {
-        try {
-            // فتح الصفحة عبر المتصفح الداخلي لجلب محتواها الحقيقي
-            const html = await gopeed.runtime.webview.open(targetUrl);
-            
-            // استخراج روابط الملفات والوسائط من الصفحة
-            const extractedFiles = extractFiles(html, targetUrl);
-            
-            // إرسال الملفات المستخرجة للتحميل
-            ctx.res = {
-                title: "Extracted Media Files",
-                files: extractedFiles
-            };
-        } catch (error) {
-            console.error("Extraction error: " + error);
-        }
+    try {
+        // فتح الصفحة عبر المتصفح الداخلي لجلب المحتوى
+        const html = await gopeed.runtime.webview.open(targetUrl);
+        
+        // استخراج الملفات باستخدام دالة محسنة
+        const extractedFiles = extractFiles(html, targetUrl);
+        
+        ctx.res = {
+            title: "All Extracted Files",
+            files: extractedFiles
+        };
+    } catch (error) {
+        console.error("Extraction error: " + error);
     }
 });
 
-// دالة لاستخراج روابط الوسائط والملفات
+// دالة محسنة لاستخراج الروابط ومعالجة الامتدادات
 function extractFiles(htmlContent, baseUrl) {
     const fileLinks = [];
-    const regex = /(?:src|href)=["']([^"']+\.(?:mp4|jpg|png|jpeg|webp|pdf|zip))["']/g;
+    // تعبير منتظم يلتقط روابط الوسائط والمستندات حتى لو تبعتها معاملات إضافية
+    const regex = /(?:src|href)=["']([^"']+\.(?:mp4|mp3|pdf|zip|rar|jpg|jpeg|png|webp|apk)(?:\?[^"']*)?)["']/gi;
     let match;
+    
+    const baseObj = new URL(baseUrl);
+    const seenUrls = new Set(); // لمنع تكرار الملفات
+
     while ((match = regex.exec(htmlContent)) !== null) {
         let link = match[1];
+        
+        // معالجة الروابط النسبية وتحويلها إلى روابط كاملة وصحيحة
         if (!link.startsWith('http')) {
-            const baseObj = new URL(baseUrl);
-            link = baseObj.origin + link;
+            if (link.startsWith('//')) {
+                link = baseObj.protocol + link;
+            } else if (link.startsWith('/')) {
+                link = baseObj.origin + link;
+            } else {
+                link = baseObj.origin + '/' + link;
+            }
         }
-        fileLinks.push({
-            name: link.split('/').pop().split('?')[0],
-            url: link
-        });
+
+        // التأكد من عدم تكرار نفس الرابط
+        if (!seenUrls.has(link)) {
+            seenUrls.add(link);
+            
+            // استخراج اسم الملف الصافي وصيغته الصحيحة
+            let cleanName = link.split('/').pop().split('?')[0];
+            
+            fileLinks.push({
+                name: cleanName || "download_file",
+                url: link
+            });
+        }
     }
+    
     return fileLinks;
 }
